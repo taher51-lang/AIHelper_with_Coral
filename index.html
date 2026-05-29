@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dev-to-Creator Pipeline</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #18181b; }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+        .tab-btn.active { border-bottom-color: #6366f1; color: #f4f4f5; }
+        .tab-content.active { display: block; }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        zinc: { 950: '#09090b', 900: '#18181b', 800: '#27272a', 50: '#fafafa', 100: '#f4f4f5' },
+                        indigo: { 500: '#6366f1', 600: '#4f46e5' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-zinc-950 text-zinc-50 min-h-screen flex antialiased">
+    <!-- Left Sidebar: Control Panel -->
+    <aside class="w-[400px] border-r border-zinc-800 p-8 flex flex-col flex-shrink-0 bg-zinc-950 z-10 shadow-xl">
+        <div class="mb-10">
+            <h1 class="text-2xl font-bold tracking-tight text-white mb-1">Dev-to-Creator Pipeline</h1>
+            <p class="text-sm text-zinc-400">Turn code metrics into distribution campaigns</p>
+        </div>
+
+        <form id="campaignForm" class="flex flex-col gap-6 flex-grow">
+            <div class="flex flex-col gap-2">
+                <label for="intent" class="text-sm font-medium text-zinc-300">Goal / Intent</label>
+                <textarea id="intent" rows="5" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none" placeholder="e.g. Find my recent feature updates from this week and make a launch post" required></textarea>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label for="tone" class="text-sm font-medium text-zinc-300">Target Tone</label>
+                <select id="tone" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all appearance-none cursor-pointer">
+                    <option value="Professional">Professional</option>
+                    <option value="Technical">Technical</option>
+                    <option value="Casual">Casual</option>
+                    <option value="Hype">Hype</option>
+                </select>
+            </div>
+
+            <div class="mt-auto pt-8">
+                <button type="submit" id="submitBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    Generate Campaign
+                </button>
+            </div>
+        </form>
+    </aside>
+
+    <!-- Right Area: Workspace Preview -->
+    <main class="flex-grow flex flex-col relative h-screen overflow-hidden bg-zinc-950">
+        
+        <!-- Error Banner -->
+        <div id="errorBanner" class="hidden absolute top-0 left-0 right-0 z-50 bg-red-900/40 border-b border-red-800 text-red-200 px-6 py-4 flex items-start gap-3 backdrop-blur-sm">
+            <svg class="w-5 h-5 flex-shrink-0 mt-0.5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            <div class="flex-grow">
+                <h3 class="font-medium">API Error</h3>
+                <p id="errorText" class="text-sm opacity-90 mt-1">Failed to connect to the backend.</p>
+            </div>
+            <button onclick="hideError()" class="text-red-400 hover:text-red-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="hidden absolute inset-0 bg-zinc-950/80 backdrop-blur-sm z-40 flex items-center justify-center">
+            <div class="flex flex-col items-center gap-6 max-w-md w-full p-8 rounded-2xl border border-zinc-800 bg-zinc-900/50">
+                <!-- Spinner -->
+                <svg class="animate-spin h-10 w-10 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                
+                <div class="text-center w-full space-y-4">
+                    <p class="text-zinc-300 font-medium animate-pulse">Analyzing repositories & generating copy...</p>
+                    
+                    <!-- Skeletons -->
+                    <div class="space-y-3">
+                        <div class="h-4 bg-zinc-800 rounded w-3/4 mx-auto animate-pulse"></div>
+                        <div class="h-4 bg-zinc-800 rounded w-1/2 mx-auto animate-pulse"></div>
+                        <div class="h-4 bg-zinc-800 rounded w-5/6 mx-auto animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="flex-grow flex flex-col items-center justify-center text-zinc-500 p-8 h-full">
+            <svg class="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+            <p class="text-lg">Your generated campaign will appear here.</p>
+        </div>
+
+        <!-- Results Area -->
+        <div id="resultsArea" class="hidden flex-col h-full">
+            
+            <!-- Header & Tabs -->
+            <div class="border-b border-zinc-800 px-8 pt-8 bg-zinc-950 z-20">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 id="campaignName" class="text-xl font-semibold text-white">Campaign Name</h2>
+                </div>
+                
+                <div class="flex space-x-8">
+                    <button onclick="switchTab('twitter')" class="tab-btn active pb-4 text-sm font-medium text-zinc-400 border-b-2 border-transparent hover:text-zinc-200 transition-colors" data-tab="twitter">X / Twitter</button>
+                    <button onclick="switchTab('linkedin')" class="tab-btn pb-4 text-sm font-medium text-zinc-400 border-b-2 border-transparent hover:text-zinc-200 transition-colors" data-tab="linkedin">LinkedIn</button>
+                    <button onclick="switchTab('instagram')" class="tab-btn pb-4 text-sm font-medium text-zinc-400 border-b-2 border-transparent hover:text-zinc-200 transition-colors" data-tab="instagram">Instagram</button>
+                </div>
+            </div>
+
+            <!-- Scrollable Content Area -->
+            <div class="flex-grow overflow-y-auto p-8 relative">
+                
+                <!-- Tab: Twitter -->
+                <div id="tab-twitter" class="tab-content active max-w-lg mx-auto">
+                    <div class="flex justify-end mb-4">
+                        <button onclick="copyContent('twitter-text', this)" class="text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                            <span>Copy Thread</span>
+                        </button>
+                    </div>
+                    
+                    <div id="twitter-feed" class="relative pl-6 border-l-2 border-zinc-800 space-y-6">
+                        <!-- Tweets injected here -->
+                    </div>
+                    <div id="twitter-text" class="hidden"></div>
+                </div>
+
+                <!-- Tab: LinkedIn -->
+                <div id="tab-linkedin" class="tab-content hidden max-w-2xl mx-auto">
+                    <div class="flex justify-end mb-4">
+                        <button onclick="copyContent('linkedin-text', this)" class="text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                            <span>Copy Post</span>
+                        </button>
+                    </div>
+                    
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                            </div>
+                            <div>
+                                <div class="font-medium text-sm text-zinc-100">Dev to Creator</div>
+                                <div class="text-xs text-zinc-500">Just now • 🌐</div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-zinc-200 text-sm leading-relaxed whitespace-pre-wrap">
+                            <p id="linkedin-hook" class="font-semibold italic mb-4"></p>
+                            <p id="linkedin-body" class="mb-6"></p>
+                        </div>
+                        
+                        <div id="linkedin-hashtags" class="text-indigo-400 text-sm font-medium bg-indigo-900/20 border border-indigo-900/30 px-3 py-2 rounded-md inline-block"></div>
+                    </div>
+                    <div id="linkedin-text" class="hidden"></div>
+                </div>
+
+                <!-- Tab: Instagram -->
+                <div id="tab-instagram" class="tab-content hidden max-w-5xl mx-auto">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                        
+                        <!-- Left: Prompt -->
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center justify-between mb-1">
+                                <h3 class="text-sm font-medium text-zinc-400">AI Image Prompt</h3>
+                                <button onclick="copyContent('ig-prompt', this)" class="text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors shadow-sm">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                    <span>Copy Prompt</span>
+                                </button>
+                            </div>
+                            <pre id="ig-prompt-display" class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-sm text-emerald-400 whitespace-pre-wrap font-mono shadow-inner leading-relaxed"></pre>
+                            <div id="ig-prompt" class="hidden"></div>
+                        </div>
+                        
+                        <!-- Right: Caption -->
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center justify-between mb-1">
+                                <h3 class="text-sm font-medium text-zinc-400">Caption & Tags</h3>
+                                <button onclick="copyContent('ig-caption', this)" class="text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors shadow-sm">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                    <span>Copy Caption</span>
+                                </button>
+                            </div>
+                            
+                            <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+                                <!-- Image Placeholder -->
+                                <div class="w-full aspect-square bg-zinc-800/50 flex flex-col items-center justify-center text-zinc-600 border-b border-zinc-800 relative">
+                                    <svg class="w-12 h-12 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                    <span class="text-xs font-medium uppercase tracking-wider">Image Area</span>
+                                </div>
+                                <div class="p-5">
+                                    <p id="ig-caption-display" class="text-sm text-zinc-200 whitespace-pre-wrap"></p>
+                                </div>
+                            </div>
+                            <div id="ig-caption" class="hidden"></div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Javascript Logic -->
+    <script>
+        // Tab Switching
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active', 'text-zinc-200'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            const selectedBtn = document.querySelector(`[data-tab="${tabId}"]`);
+            selectedBtn.classList.add('active', 'text-zinc-200');
+            
+            const selectedContent = document.getElementById(`tab-${tabId}`);
+            selectedContent.classList.remove('hidden');
+            selectedContent.classList.add('active');
+        }
+
+        // Copy to Clipboard
+        function copyContent(elementId, btnElement) {
+            const textToCopy = document.getElementById(elementId).innerText;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const originalHtml = btnElement.innerHTML;
+                btnElement.innerHTML = `<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg><span class="text-emerald-400">✓ Copied!</span>`;
+                setTimeout(() => {
+                    btnElement.innerHTML = originalHtml;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
+        }
+
+        // Error Banner
+        function showError(message) {
+            const banner = document.getElementById('errorBanner');
+            const text = document.getElementById('errorText');
+            text.innerText = message;
+            banner.classList.remove('hidden');
+            
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            if(document.getElementById('resultsArea').classList.contains('hidden')){
+                document.getElementById('emptyState').classList.remove('hidden');
+            }
+        }
+
+        function hideError() {
+            document.getElementById('errorBanner').classList.add('hidden');
+        }
+
+        // Form Submission
+        document.getElementById('campaignForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError();
+            
+            const intent = document.getElementById('intent').value;
+            const tone = document.getElementById('tone').value;
+            
+            // UI States
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('resultsArea').classList.add('hidden');
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/generate-campaign', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_intent: intent, tone: tone })
+                });
+
+                if (!response.ok) {
+                    let errMsg = `Server returned ${response.status}`;
+                    try {
+                        const errData = await response.json();
+                        errMsg = errData.detail?.message || errData.detail || errMsg;
+                    } catch (e) {}
+                    throw new Error(errMsg);
+                }
+
+                const data = await response.json();
+                
+                // --- Inject Data into UI ---
+                document.getElementById('campaignName').innerText = data.campaign_name || 'Generated Campaign';
+
+                // 1. Twitter Thread
+                const twitterFeed = document.getElementById('twitter-feed');
+                twitterFeed.innerHTML = '';
+                const rawTweets = data.twitter.tweets || [];
+                let fullTwitterText = '';
+                
+                rawTweets.forEach((tweet, index) => {
+                    fullTwitterText += `${tweet}\n\n`;
+                    
+                    const tweetEl = document.createElement('div');
+                    tweetEl.className = 'relative bg-zinc-900 border border-zinc-800 rounded-xl p-4 shadow-sm ml-4 before:content-[""] before:absolute before:-left-[21px] before:top-6 before:w-5 before:h-0.5 before:bg-zinc-800';
+                    
+                    // Avatar bubble on the line
+                    const avatar = document.createElement('div');
+                    avatar.className = 'absolute -left-[35px] top-4 w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center ring-4 ring-zinc-950 z-10 text-zinc-500';
+                    avatar.innerHTML = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
+                    
+                    tweetEl.appendChild(avatar);
+
+                    // Add verified badge checkmark inline SVG
+                    const verifiedIcon = `<svg class="w-4 h-4 text-blue-500 ml-1 inline" viewBox="0 0 24 24" fill="currentColor"><path d="M22.5 12.5c0-.82-.68-1.5-1.5-1.5h-1.5c-.82 0-1.5-.68-1.5-1.5s.68-1.5 1.5-1.5h1.5c.82 0 1.5-.68 1.5-1.5s-.68-1.5-1.5-1.5h-1.5c-.82 0-1.5-.68-1.5-1.5s.68-1.5 1.5-1.5h1.5c.82 0 1.5-.68 1.5-1.5 0-.82-.68-1.5-1.5-1.5h-1.5c-.82 0-1.5-.68-1.5-1.5 0-.82-.68-1.5-1.5-1.5H12.5c-.82 0-1.5.68-1.5 1.5s.68 1.5 1.5 1.5H14c.82 0 1.5.68 1.5 1.5s-.68 1.5-1.5 1.5h-1.5c-.82 0-1.5.68-1.5 1.5s.68 1.5 1.5 1.5h1.5c.82 0 1.5.68 1.5 1.5s-.68 1.5-1.5 1.5h-1.5c-.82 0-1.5.68-1.5 1.5 0 .82.68 1.5 1.5 1.5h1.5c.82 0 1.5.68 1.5 1.5 0 .82.68 1.5 1.5 1.5z"></path><path d="M10 15.172l-3.536-3.536-1.414 1.414 4.95 4.95 9.9-9.9-1.414-1.414L10 15.172z" fill="#fff" transform="translate(1 1)"></path></svg>`;
+
+                    tweetEl.innerHTML += `
+                        <div class="flex items-center mb-2">
+                            <span class="font-bold text-sm text-zinc-100">Dev to Creator</span>
+                            ${verifiedIcon}
+                            <span class="text-zinc-500 text-sm ml-2">@dev_to_creator</span>
+                        </div>
+                        <p class="text-zinc-200 text-sm leading-relaxed">${tweet}</p>
+                    `;
+                    twitterFeed.appendChild(tweetEl);
+                });
+                document.getElementById('twitter-text').innerText = fullTwitterText.trim();
+
+                // 2. LinkedIn
+                const liHook = data.linkedin?.hook || '';
+                const liBody = data.linkedin?.body || '';
+                const liTags = data.linkedin?.hashtags || '';
+                
+                document.getElementById('linkedin-hook').innerText = liHook;
+                document.getElementById('linkedin-body').innerText = liBody;
+                document.getElementById('linkedin-hashtags').innerText = liTags;
+                document.getElementById('linkedin-text').innerText = `${liHook}\n\n${liBody}\n\n${liTags}`;
+
+                // 3. Instagram
+                const igPrompt = data.instagram?.image_generation_prompt || '';
+                const igCaption = data.instagram?.caption || '';
+                
+                document.getElementById('ig-prompt-display').innerText = igPrompt;
+                document.getElementById('ig-prompt').innerText = igPrompt;
+                
+                document.getElementById('ig-caption-display').innerText = igCaption;
+                document.getElementById('ig-caption').innerText = igCaption;
+
+                // Show Results
+                document.getElementById('loadingOverlay').classList.add('hidden');
+                document.getElementById('resultsArea').classList.remove('hidden');
+                document.getElementById('resultsArea').classList.add('flex');
+                
+                // Default to Twitter tab
+                switchTab('twitter');
+
+            } catch (error) {
+                console.error(error);
+                showError(error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+        });
+    </script>
+</body>
+</html>
