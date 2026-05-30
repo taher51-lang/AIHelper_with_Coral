@@ -6,10 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dev-to-Creator Pipeline</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #060B14;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(255, 77, 77, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.05) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+        
+        h1, h2, h3, .font-heading {
+            font-family: 'Outfit', sans-serif;
         }
 
         /* Custom scrollbar for webkit */
@@ -18,21 +27,21 @@
         }
 
         ::-webkit-scrollbar-track {
-            background: #18181b;
+            background: #0B1221;
         }
 
         ::-webkit-scrollbar-thumb {
-            background: #3f3f46;
+            background: #1F2E4A;
             border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: #52525b;
+            background: #33476E;
         }
 
         .tab-btn.active {
-            border-bottom-color: #6366f1;
-            color: #f4f4f5;
+            border-bottom-color: #FF4D4D;
+            color: #F4F8FB;
         }
 
         .tab-content.active {
@@ -45,10 +54,10 @@
             width: 160px;
             height: 160px;
             border-radius: 50%;
-            background: conic-gradient(var(--score-color, #6366f1) 0deg,
-                    var(--score-color, #6366f1) var(--score-deg, 0deg),
-                    #27272a var(--score-deg, 0deg),
-                    #27272a 360deg);
+            background: conic-gradient(var(--score-color, #FF4D4D) 0deg,
+                    var(--score-color, #FF4D4D) var(--score-deg, 0deg),
+                    #141E34 var(--score-deg, 0deg),
+                    #141E34 360deg);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -60,7 +69,7 @@
             position: absolute;
             inset: 8px;
             border-radius: 50%;
-            background: #09090b;
+            background: #060B14;
         }
 
         .score-ring .score-inner {
@@ -73,7 +82,7 @@
             font-size: 2.5rem;
             font-weight: 700;
             line-height: 1;
-            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            background: linear-gradient(135deg, #fff 0%, #FFC2C2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -82,7 +91,7 @@
             position: absolute;
             inset: -6px;
             border-radius: 50%;
-            background: conic-gradient(var(--score-color, #6366f1) 0deg,
+            background: conic-gradient(var(--score-color, #FF4D4D) 0deg,
                     transparent var(--score-deg, 0deg),
                     transparent 360deg);
             filter: blur(16px);
@@ -94,7 +103,7 @@
         .dim-bar-track {
             width: 100%;
             height: 6px;
-            background: #27272a;
+            background: #141E34;
             border-radius: 3px;
             overflow: hidden;
         }
@@ -149,9 +158,9 @@
             border-radius: 9999px;
             font-size: 0.65rem;
             font-weight: 500;
-            border: 1px solid #3f3f46;
-            background: #18181b;
-            color: #a1a1aa;
+            border: 1px solid #1F2E4A;
+            background: #0B1221;
+            color: #A1B4D6;
         }
 
         /* ── Timeline Styles ─────────────────────────── */
@@ -167,7 +176,7 @@
             bottom: 0;
             left: 7px;
             width: 2px;
-            background: #27272a;
+            background: #141E34;
         }
 
         .timeline-node {
@@ -186,8 +195,8 @@
             width: 16px;
             height: 16px;
             border-radius: 50%;
-            background: #18181b;
-            border: 2px solid #3f3f46;
+            background: #0B1221;
+            border: 2px solid #1F2E4A;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -195,18 +204,22 @@
         }
 
         .timeline-hero-box {
-            background: linear-gradient(145deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.05) 100%);
-            border: 1px solid rgba(99, 102, 241, 0.2);
-            box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
+            background: linear-gradient(145deg, rgba(255, 77, 77, 0.1) 0%, rgba(14, 165, 233, 0.05) 100%);
+            border: 1px solid rgba(255, 77, 77, 0.2);
+            box-shadow: 0 0 20px rgba(255, 77, 77, 0.1);
         }
     </style>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        heading: ['"Outfit"', 'sans-serif']
+                    },
                     colors: {
-                        zinc: { 950: '#09090b', 900: '#18181b', 800: '#27272a', 50: '#fafafa', 100: '#f4f4f5' },
-                        indigo: { 500: '#6366f1', 600: '#4f46e5' }
+                        zinc: { 950: '#060B14', 900: '#0B1221', 800: '#141E34', 700: '#1F2E4A', 600: '#33476E', 500: '#4F6693', 400: '#758DB8', 300: '#A1B4D6', 200: '#C7D6ED', 100: '#E6EEF8', 50: '#F4F8FB' },
+                        indigo: { 950: '#420808', 900: '#781313', 800: '#991A1A', 700: '#BF2626', 600: '#E63939', 500: '#FF4D4D', 400: '#FF7070', 300: '#FFA0A0', 200: '#FFC2C2', 100: '#FFE0E0', 50: '#FFF0F0' }
                     }
                 }
             }
@@ -414,10 +427,38 @@
 
             <!-- Header & Tabs -->
             <div class="border-b border-zinc-800 px-8 pt-8 bg-zinc-950 z-20">
-                <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center justify-between mb-4">
                     <h2 id="campaignName" class="text-xl font-semibold text-white">Campaign Name</h2>
                 </div>
 
+                <!-- AI Reasoning Panel -->
+                <div id="reasoningPanel" class="hidden mb-5">
+                    <button onclick="toggleReasoning()" id="reasoningToggle"
+                        class="w-full flex items-center justify-between px-4 py-3 rounded-t-xl bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 hover:border-indigo-500/40 transition-all group">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">🧠</span>
+                            <span class="text-sm font-semibold text-indigo-300 group-hover:text-indigo-200 transition-colors">Why this campaign?</span>
+                            <span id="reasoningAngleBadge" class="text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full"></span>
+                        </div>
+                        <svg id="reasoningChevron" class="w-4 h-4 text-indigo-400 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="reasoningBody" class="hidden border border-t-0 border-indigo-500/20 rounded-b-xl bg-zinc-900/80 backdrop-blur-sm px-5 py-4 space-y-3 animate-in">
+                        <div>
+                            <span class="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Marketing Angle</span>
+                            <p id="reasoningAngle" class="text-sm text-zinc-200 mt-1 font-medium"></p>
+                        </div>
+                        <div class="border-t border-zinc-800 pt-3">
+                            <span class="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Narrative Hook</span>
+                            <p id="reasoningHook" class="text-sm text-zinc-300 mt-1 leading-relaxed italic"></p>
+                        </div>
+                        <div class="border-t border-zinc-800 pt-3">
+                            <span class="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Value Proposition</span>
+                            <p id="reasoningValue" class="text-sm text-zinc-300 mt-1 leading-relaxed"></p>
+                        </div>
+                    </div>
+                </div>
                 <div class="flex space-x-8">
                     <button onclick="switchTab('twitter')"
                         class="tab-btn active pb-4 text-sm font-medium text-zinc-400 border-b-2 border-transparent hover:text-zinc-200 transition-colors"
@@ -675,11 +716,38 @@
                 </div>
 
             </div>
+            
+            <!-- Refine Campaign Footer -->
+            <div id="refineContainer" class="border-t border-zinc-800 bg-zinc-950 p-4 shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-20">
+                <form id="refineForm" class="flex items-center gap-3 max-w-4xl mx-auto">
+                    <div class="relative flex-grow">
+                        <input type="text" id="refineInput" 
+                            class="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-10 pr-4 py-3 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all"
+                            placeholder="Tweak this campaign (e.g., 'make it punchier', 'focus on the frontend...')"
+                            required>
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                            </svg>
+                        </span>
+                    </div>
+                    <button type="submit" id="refineBtn"
+                        class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-5 rounded-lg transition-colors flex items-center gap-2 shadow-sm text-sm shrink-0">
+                        <span>Refine</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+                </form>
+            </div>
         </div>
+
     </main>
 
     <!-- Javascript Logic -->
     <script>
+        let currentCampaignResult = null;
+
         // Tab Switching
         function switchTab(tabId) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active', 'text-zinc-200'));
@@ -1004,14 +1072,29 @@
                 }
 
                 const data = await response.json();
+                currentCampaignResult = data;
+                const campaign = data.campaign;
+                const reasoning = data.reasoning;
+
+                // --- Populate AI Reasoning Panel ---
+                if (reasoning) {
+                    document.getElementById('reasoningAngle').innerText = reasoning.selected_marketing_angle;
+                    document.getElementById('reasoningHook').innerText = reasoning.core_narrative_hook;
+                    document.getElementById('reasoningValue').innerText = reasoning.key_value_proposition;
+                    document.getElementById('reasoningAngleBadge').innerText = reasoning.selected_marketing_angle;
+                    document.getElementById('reasoningPanel').classList.remove('hidden');
+                    // Reset to collapsed state
+                    document.getElementById('reasoningBody').classList.add('hidden');
+                    document.getElementById('reasoningChevron').style.transform = 'rotate(0deg)';
+                }
 
                 // --- Inject Data into UI ---
-                document.getElementById('campaignName').innerText = data.campaign_name || 'Generated Campaign';
+                document.getElementById('campaignName').innerText = campaign.campaign_name || 'Generated Campaign';
 
                 // 1. Twitter Thread
                 const twitterFeed = document.getElementById('twitter-feed');
                 twitterFeed.innerHTML = '';
-                const rawTweets = data.twitter.tweets || [];
+                const rawTweets = campaign.twitter.tweets || [];
                 let fullTwitterText = '';
 
                 rawTweets.forEach((tweet, index) => {
@@ -1043,9 +1126,9 @@
                 document.getElementById('twitter-text').innerText = fullTwitterText.trim();
 
                 // 2. LinkedIn
-                const liHook = data.linkedin?.hook || '';
-                const liBody = data.linkedin?.body || '';
-                const liTags = data.linkedin?.hashtags || '';
+                const liHook = campaign.linkedin?.hook || '';
+                const liBody = campaign.linkedin?.body || '';
+                const liTags = campaign.linkedin?.hashtags || '';
 
                 document.getElementById('linkedin-hook').innerText = liHook;
                 document.getElementById('linkedin-body').innerText = liBody;
@@ -1053,8 +1136,8 @@
                 document.getElementById('linkedin-text').innerText = `${liHook}\n\n${liBody}\n\n${liTags}`;
 
                 // 3. Instagram
-                const igPrompt = data.instagram?.image_generation_prompt || '';
-                const igCaption = data.instagram?.caption || '';
+                const igPrompt = campaign.instagram?.image_generation_prompt || '';
+                const igCaption = campaign.instagram?.caption || '';
 
                 document.getElementById('ig-prompt-display').innerText = igPrompt;
                 document.getElementById('ig-prompt').innerText = igPrompt;
@@ -1076,6 +1159,134 @@
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+        });
+
+        // Toggle AI Reasoning Panel
+        function toggleReasoning() {
+            const body = document.getElementById('reasoningBody');
+            const chevron = document.getElementById('reasoningChevron');
+            const isHidden = body.classList.contains('hidden');
+
+            if (isHidden) {
+                body.classList.remove('hidden');
+                chevron.style.transform = 'rotate(180deg)';
+            } else {
+                body.classList.add('hidden');
+                chevron.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // Refine Campaign Submission
+        document.getElementById('refineForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentCampaignResult) return;
+            
+            const feedback = document.getElementById('refineInput').value;
+            if (!feedback.trim()) return;
+
+            hideError();
+            
+            // UI States
+            document.getElementById('resultsArea').classList.add('hidden');
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            const refineBtn = document.getElementById('refineBtn');
+            refineBtn.disabled = true;
+            refineBtn.classList.add('opacity-70', 'cursor-not-allowed');
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/refine-campaign', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        previous_result: currentCampaignResult, 
+                        feedback: feedback 
+                    })
+                });
+
+                if (!response.ok) {
+                    let errMsg = `Server returned ${response.status}`;
+                    try {
+                        const errData = await response.json();
+                        errMsg = errData.detail?.message || errData.detail || errMsg;
+                    } catch (e) { }
+                    throw new Error(errMsg);
+                }
+
+                const data = await response.json();
+                currentCampaignResult = data;
+                const campaign = data.campaign;
+                const reasoning = data.reasoning;
+
+                // --- Populate AI Reasoning Panel ---
+                if (reasoning) {
+                    document.getElementById('reasoningAngle').innerText = reasoning.selected_marketing_angle;
+                    document.getElementById('reasoningHook').innerText = reasoning.core_narrative_hook;
+                    document.getElementById('reasoningValue').innerText = reasoning.key_value_proposition;
+                    document.getElementById('reasoningAngleBadge').innerText = reasoning.selected_marketing_angle;
+                    // Keep panel visible but collapsed
+                    document.getElementById('reasoningBody').classList.add('hidden');
+                    document.getElementById('reasoningChevron').style.transform = 'rotate(0deg)';
+                }
+
+                // --- Inject Data into UI ---
+                document.getElementById('campaignName').innerText = campaign.campaign_name || 'Generated Campaign';
+
+                // 1. Twitter Thread
+                const twitterFeed = document.getElementById('twitter-feed');
+                twitterFeed.innerHTML = '';
+                const rawTweets = campaign.twitter.tweets || [];
+                let fullTwitterText = '';
+
+                rawTweets.forEach((tweet, index) => {
+                    fullTwitterText += `${tweet}\n\n`;
+                    const tweetEl = document.createElement('div');
+                    tweetEl.className = 'relative bg-zinc-900 border border-zinc-800 rounded-xl p-4 shadow-sm ml-4 before:content-[""] before:absolute before:-left-[21px] before:top-6 before:w-5 before:h-0.5 before:bg-zinc-800';
+                    const avatar = document.createElement('div');
+                    avatar.className = 'absolute -left-[35px] top-4 w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center ring-4 ring-zinc-950 z-10 text-zinc-500';
+                    avatar.innerHTML = `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
+                    tweetEl.appendChild(avatar);
+                    const verifiedIcon = `<svg class="w-4 h-4 text-blue-500 ml-1 inline" viewBox="0 0 24 24" fill="currentColor"><path d="M22.5 12.5c0-.82-.68-1.5-1.5-1.5h-1.5c-.82 0-1.5-.68-1.5-1.5s.68-1.5 1.5-1.5h1.5c.82 0 1.5-.68 1.5-1.5s-.68-1.5-1.5-1.5h-1.5c-.82 0-1.5-.68-1.5-1.5s.68-1.5 1.5-1.5h1.5c.82 0 1.5-.68 1.5-1.5 0-.82-.68-1.5-1.5-1.5h-1.5c-.82 0-1.5-.68-1.5-1.5 0-.82-.68-1.5-1.5-1.5H12.5c-.82 0-1.5.68-1.5 1.5s.68 1.5 1.5 1.5H14c.82 0 1.5.68 1.5 1.5s-.68 1.5-1.5 1.5h-1.5c-.82 0-1.5.68-1.5 1.5s.68 1.5 1.5 1.5h1.5c.82 0 1.5.68 1.5 1.5s-.68 1.5-1.5 1.5h-1.5c-.82 0-1.5.68-1.5 1.5 0 .82.68 1.5 1.5 1.5h1.5c.82 0 1.5.68 1.5 1.5 0 .82.68 1.5 1.5 1.5z"></path><path d="M10 15.172l-3.536-3.536-1.414 1.414 4.95 4.95 9.9-9.9-1.414-1.414L10 15.172z" fill="#fff" transform="translate(1 1)"></path></svg>`;
+                    tweetEl.innerHTML += `
+                        <div class="flex items-center mb-2">
+                            <span class="font-bold text-sm text-zinc-100">Dev to Creator</span>
+                            ${verifiedIcon}
+                            <span class="text-zinc-500 text-sm ml-2">@dev_to_creator</span>
+                        </div>
+                        <p class="text-zinc-200 text-sm leading-relaxed">${tweet}</p>
+                    `;
+                    twitterFeed.appendChild(tweetEl);
+                });
+                document.getElementById('twitter-text').innerText = fullTwitterText.trim();
+
+                // 2. LinkedIn
+                const liHook = campaign.linkedin?.hook || '';
+                const liBody = campaign.linkedin?.body || '';
+                const liTags = campaign.linkedin?.hashtags || '';
+                document.getElementById('linkedin-hook').innerText = liHook;
+                document.getElementById('linkedin-body').innerText = liBody;
+                document.getElementById('linkedin-hashtags').innerText = liTags;
+                document.getElementById('linkedin-text').innerText = `${liHook}\n\n${liBody}\n\n${liTags}`;
+
+                // 3. Instagram
+                const igPrompt = campaign.instagram?.image_generation_prompt || '';
+                const igCaption = campaign.instagram?.caption || '';
+                document.getElementById('ig-prompt-display').innerText = igPrompt;
+                document.getElementById('ig-prompt').innerText = igPrompt;
+                document.getElementById('ig-caption-display').innerText = igCaption;
+                document.getElementById('ig-caption').innerText = igCaption;
+
+                // Show Results
+                document.getElementById('loadingOverlay').classList.add('hidden');
+                document.getElementById('resultsArea').classList.remove('hidden');
+                document.getElementById('refineInput').value = ''; // clear input
+
+            } catch (error) {
+                console.error(error);
+                showError(error.message);
+            } finally {
+                refineBtn.disabled = false;
+                refineBtn.classList.remove('opacity-70', 'cursor-not-allowed');
             }
         });
     </script>

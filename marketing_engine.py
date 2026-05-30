@@ -57,6 +57,11 @@ class MarketingCampaign(BaseModel):
     twitter: TwitterThread
     instagram: InstagramConcept
 
+class CampaignResult(BaseModel):
+    """Full result bundling the campaign with the AI's reasoning."""
+    campaign: MarketingCampaign
+    reasoning: CampaignStrategy
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  System Prompts
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -115,7 +120,7 @@ async def transform_data_to_campaign(
     synthesized_context: dict,
     original_goal: str,
     target_tone: str,
-) -> MarketingCampaign:
+) -> CampaignResult:
     """Transform synthesized data into a campaign using a Two-Stage Reasoning Chain."""
     
     api_key = os.environ.get("GROQ_API_KEY")
@@ -188,4 +193,67 @@ async def transform_data_to_campaign(
             campaign.twitter.tweets[i] = tweet[:277] + "..."
 
     logger.info("✅ Campaign '%s' fully generated.", campaign.campaign_name)
-    return campaign
+    return CampaignResult(campaign=campaign, reasoning=strategy)
+
+
+async def refine_campaign(
+    previous_result: CampaignResult,
+    user_feedback: str,
+) -> CampaignResult:
+    """Regenerate a campaign based on user feedback on the previous result."""
+    
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("Missing API key. Set GROQ_API_KEY.")
+
+    client = AsyncGroq(api_key=api_key)
+
+    logger.info("🔄 REFINING Campaign: '%s' based on feedback: %s", previous_result.campaign.campaign_name, user_feedback)
+
+    refine_message = (
+        f"## Previous Campaign Strategy\n"
+        f"```json\n{previous_result.reasoning.model_dump_json(indent=2)}\n```\n\n"
+        f"## Previous Generated Campaign\n"
+        f"```json\n{previous_result.campaign.model_dump_json(indent=2)}\n```\n\n"
+        f"## User Feedback\n"
+        f"The user wants you to modify the campaign based on this feedback:\n"
+        f'"{user_feedback}"\n\n'
+        f"Apply this feedback to the campaign. First update the strategy if needed to match the new direction, then generate the new copy."
+    )
+
+    # We can do this in one shot for refinement to save time/tokens, combining strategy and copy
+    refine_prompt = (
+        "You are an elite Developer Relations strategist and copywriter.\n"
+        "You have previously generated a campaign, but the user wants changes.\n"
+        "Take their feedback, update the strategy, and rewrite the campaign copy to match.\n\n"
+        "Return a strictly formatted JSON object matching this schema:\n"
+        f"{json.dumps(CampaignResult.model_json_schema(), indent=2)}"
+    )
+
+    try:
+        response = await client.chat.completions.create(
+            model=MODEL_ID,
+            messages=[
+                {"role": "system", "content": refine_prompt},
+                {"role": "user", "content": refine_message},
+            ],
+            temperature=0.7,
+            response_format={"type": "json_object"}
+        )
+        raw_text = response.choices[0].message.content
+        if not raw_text:
+            raise RuntimeError("Empty response from Groq during refinement.")
+        
+        refined_result = CampaignResult.model_validate_json(raw_text)
+    except Exception as exc:
+        logger.error("Refinement failed: %s", exc)
+        raise RuntimeError(f"Refinement failed: {exc}") from exc
+
+    # Enforce strict tweet character limits as a safety net
+    for i, tweet in enumerate(refined_result.campaign.twitter.tweets):
+        if len(tweet) > 280:
+            logger.warning("Tweet %d exceeded 280 chars (%d). Truncating.", i + 1, len(tweet))
+            refined_result.campaign.twitter.tweets[i] = tweet[:277] + "..."
+
+    logger.info("✅ Refined Campaign '%s' fully generated.", refined_result.campaign.campaign_name)
+    return refined_result

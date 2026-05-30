@@ -34,7 +34,7 @@ from pydantic import BaseModel, Field
 # ── Local modules ────────────────────────────────────────────────────────────
 from coral_client import run_coral_sql
 from sql_agent import generate_coral_query
-from marketing_engine import transform_data_to_campaign, MarketingCampaign
+from marketing_engine import transform_data_to_campaign, MarketingCampaign, CampaignResult, refine_campaign
 from data_synthesizer import synthesize_github_data
 
 # ── Load .env early (before anything reads os.environ) ───────────────────────
@@ -112,6 +112,12 @@ class CampaignRequest(BaseModel):
         examples=["Professional", "Casual", "Technical", "Hype"],
         description="The desired tone for the generated marketing copy.",
     )
+
+
+class RefineRequest(BaseModel):
+    """Incoming request to refine a generated campaign."""
+    previous_result: CampaignResult = Field(..., description="The full previous campaign and strategy result.")
+    feedback: str = Field(..., description="The user's feedback or instructions for changes.")
 
 
 class TranslatedEvent(BaseModel):
@@ -321,14 +327,14 @@ async def developer_score():
 
 @app.post(
     "/api/generate-campaign",
-    response_model=MarketingCampaign,
+    response_model=CampaignResult,
     tags=["Campaigns"],
     summary="Generate a multi-platform marketing campaign from GitHub data",
 )
 async def generate_campaign(
     request: CampaignRequest,
     background_tasks: BackgroundTasks,
-) -> MarketingCampaign:
+) -> CampaignResult:
     """
     End-to-end pipeline:
     Intent → SQL → Coral data → Marketing campaign → JSON response.
@@ -430,7 +436,7 @@ async def generate_campaign(
     synthesized_context = synthesize_github_data(raw_data)
 
     try:
-        campaign = await transform_data_to_campaign(synthesized_context, intent, tone)
+        result = await transform_data_to_campaign(synthesized_context, intent, tone)
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except RuntimeError as exc:
@@ -439,9 +445,12 @@ async def generate_campaign(
             detail=f"Marketing engine failed: {exc}",
         ) from exc
 
+    campaign = result.campaign
+
     logger.info("━" * 60)
     logger.info("🏆  PIPELINE COMPLETE")
     logger.info("   Campaign : %s", campaign.campaign_name)
+    logger.info("   Reasoning: %s", result.reasoning.selected_marketing_angle)
     logger.info("   LinkedIn : %d chars", len(campaign.linkedin.body))
     logger.info("   Tweets   : %d tweets", len(campaign.twitter.tweets))
     logger.info("   IG prompt: %.80s…", campaign.instagram.image_generation_prompt)
@@ -454,7 +463,50 @@ async def generate_campaign(
         campaign.linkedin.hook,
     )
 
-    return campaign
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Refine campaign endpoint
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post(
+    "/api/refine-campaign",
+    response_model=CampaignResult,
+    tags=["Campaigns"],
+    summary="Refine a generated campaign using user feedback",
+)
+async def refine_campaign_endpoint(
+    request: RefineRequest,
+    background_tasks: BackgroundTasks,
+) -> CampaignResult:
+    """Iteratively refine an existing campaign based on user feedback."""
+    
+    logger.info("━" * 60)
+    logger.info("🔄  REFINING CAMPAIGN")
+    logger.info("   Feedback: %s", request.feedback)
+    logger.info("━" * 60)
+
+    try:
+        result = await refine_campaign(request.previous_result, request.feedback)
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Refinement failed: {exc}",
+        ) from exc
+
+    logger.info("✅ Refinement complete.")
+    
+    # ── Fire webhook in the background (non-blocking) ─────────────────────
+    background_tasks.add_task(
+        send_webhook_alert,
+        result.campaign.campaign_name,
+        result.campaign.linkedin.hook,
+    )
+
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
