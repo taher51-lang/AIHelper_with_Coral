@@ -75,6 +75,7 @@ AVAILABLE TABLES AND COLUMNS  (you MUST NOT invent any others)
 
 1. github.user_repos
    ├── name               (text)   — repository name
+   ├── owner__login       (text)   — the owner of the repository
    ├── description         (text)   — repo description (can be NULL)
    ├── language            (text)   — primary programming language
    ├── stargazers_count    (int)    — number of stars
@@ -132,7 +133,7 @@ RULES
 • When the user says "updates", "activity", or "latest", prefer
   github.events ordered by created_at DESC — it captures all activity types.
 • When the user asks about "repos", "projects", or "portfolio", use
-  github.user_repos.
+  github.user_repos. ALWAYS SELECT `name` and `owner__login` when querying `github.user_repos`.
 • For text matching (like repository names or issue titles), ALWAYS use 
   case-insensitive `ILIKE '%...%'` matching instead of strict equality `=`. 
   Use very short, single-word keywords (e.g., `ILIKE '%RAG%'`) to avoid 

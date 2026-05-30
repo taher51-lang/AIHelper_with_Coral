@@ -71,7 +71,7 @@ You will receive:
 3. The requested target tone.
 
 Analyze the 'computed_impact_score' to understand the gravity of the work, and use the 
-arrays inside 'categorized_activity' to identify the most compelling narrative angle (e.g., 
+arrays inside 'categorized_activity' (including 'readmes' if available) to identify the most compelling narrative angle (e.g., 
 Deep-Dive Educational, High-Hype Feature Launch, or Problem-Solution Refactor). 
 Return a strictly formatted CampaignStrategy JSON matching this schema:
 {

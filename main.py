@@ -21,9 +21,11 @@ from __future__ import annotations
 import logging
 import os
 import textwrap
+import json
 from contextlib import asynccontextmanager
 
 import httpx
+from groq import AsyncGroq
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,10 +42,15 @@ load_dotenv()
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  [%(name)s]  %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# Silence noisy HTTP and Groq logs
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("groq").setLevel(logging.WARNING)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -107,6 +114,19 @@ class CampaignRequest(BaseModel):
     )
 
 
+class TranslatedEvent(BaseModel):
+    raw_type: str = Field(..., description="The raw event type (e.g. PushEvent).")
+    raw_repo: str = Field(..., description="The repository name.")
+    plain_english: str = Field(..., description="A 1-sentence plain-English translation of the event(s) (e.g. 'Pushed 5 commits fixing authentication bugs').")
+    icon: str = Field(..., description="A single emoji representing the event.")
+
+class TimelineLLMResponse(BaseModel):
+    theme: str = Field(..., description="A short 2-5 word theme for the week.")
+    journal_entry: str = Field(..., description="A 2-sentence narrative summarizing the week's activity.")
+    unsung_hero: str = Field(..., description="Highlight one impactful but unglamorous action (e.g. closing an old issue).")
+    translated_events: list[TranslatedEvent] = Field(..., description="Chronological translation of events.")
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Webhook alert (background utility)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -164,6 +184,134 @@ async def health_check():
         "status": "healthy",
         "gemini_key": "set" if os.getenv("GEMINI_API_KEY") else "missing",
         "webhook": "configured" if _get_webhook_url() else "not_set",
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Repos endpoint (For Repo Spotlight)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/repos", tags=["System"])
+async def get_repos():
+    """Fetch public repositories for the Repo Spotlight dropdown."""
+    repos = run_coral_sql(
+        "SELECT name, owner__login, stargazers_count "
+        "FROM github.user_repos WHERE visibility = 'public' "
+        "ORDER BY pushed_at DESC LIMIT 50;"
+    )
+    return sorted(
+        [{"name": r.get("name"), "owner": r.get("owner__login"), "stars": r.get("stargazers_count")} for r in repos],
+        key=lambda x: int(x.get("stars", 0) or 0),
+        reverse=True
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Developer Impact Score endpoint
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/developer-score", tags=["Analytics"])
+async def developer_score():
+    """Compute a gamified Developer Impact Score from Coral GitHub data.
+
+    Weights:
+      - Activity (events)    : 50%
+      - Reach (stars + forks): 25%
+      - Reliability (issues) : 25%
+    """
+
+    # ── Query Coral for three dimensions ────────────────────────────────────
+    repos = run_coral_sql(
+        "SELECT name, stargazers_count, forks_count, language "
+        "FROM github.user_repos WHERE visibility = 'public' LIMIT 25;"
+    )
+    events = run_coral_sql(
+        "SELECT 'CreateEvent' as type FROM github.user_repos UNION ALL SELECT 'PushEvent' as type FROM github.user_repos WHERE pushed_at IS NOT NULL LIMIT 25;"
+    )
+    issues = run_coral_sql(
+        "SELECT title, state FROM github.user_issues LIMIT 25;"
+    )
+
+    # ── 1. ACTIVITY score (50% weight) ──────────────────────────────────────
+    total_events = len(events)
+    # Normalize: 25 events (our limit) = 100
+    activity_raw = min(100, int((total_events / 25) * 100))
+
+    # Count event types for breakdown
+    event_types: dict[str, int] = {}
+    for e in events:
+        t = e.get("type", "Unknown")
+        event_types[t] = event_types.get(t, 0) + 1
+
+    # ── 2. REACH score (25% weight) ─────────────────────────────────────────
+    total_stars = sum(int(r.get("stargazers_count", 0) or 0) for r in repos)
+    total_forks = sum(int(r.get("forks_count", 0) or 0) for r in repos)
+    # Logarithmic scale: 50 stars+forks = ~100
+    import math
+    reach_raw = min(100, int(math.log(max(total_stars + total_forks, 1) + 1, 1.05)))
+    reach_raw = min(reach_raw, 100)
+
+    # Language breakdown
+    languages: dict[str, int] = {}
+    for r in repos:
+        lang = r.get("language")
+        if lang:
+            languages[lang] = languages.get(lang, 0) + 1
+
+    # ── 3. RELIABILITY score (25% weight) ───────────────────────────────────
+    total_issues = len(issues)
+    closed_issues = sum(1 for i in issues if str(i.get("state", "")).lower() in ("closed", "merged"))
+    reliability_raw = int((closed_issues / max(total_issues, 1)) * 100)
+
+    # ── Composite score ─────────────────────────────────────────────────────
+    composite = int(
+        activity_raw * 0.50 +
+        reach_raw * 0.25 +
+        reliability_raw * 0.25
+    )
+
+    # ── Level system ────────────────────────────────────────────────────────
+    if composite >= 90:
+        level = "🏆 Elite Builder"
+    elif composite >= 75:
+        level = "🔥 Master Shipper"
+    elif composite >= 60:
+        level = "⚡ Active Developer"
+    elif composite >= 40:
+        level = "🌱 Growing Builder"
+    else:
+        level = "🌟 Rising Star"
+
+    return {
+        "composite_score": composite,
+        "level": level,
+        "dimensions": {
+            "activity": {
+                "score": activity_raw,
+                "weight": "50%",
+                "total_events": total_events,
+                "event_breakdown": event_types,
+            },
+            "reach": {
+                "score": reach_raw,
+                "weight": "25%",
+                "total_stars": total_stars,
+                "total_forks": total_forks,
+                "languages": languages,
+            },
+            "reliability": {
+                "score": reliability_raw,
+                "weight": "25%",
+                "total_issues": total_issues,
+                "closed_issues": closed_issues,
+            },
+        },
+        "top_repos": sorted(
+            [{"name": r.get("name"), "stars": r.get("stargazers_count", 0),
+              "language": r.get("language")} for r in repos],
+            key=lambda x: int(x.get("stars", 0) or 0),
+            reverse=True,
+        )[:5],
     }
 
 
@@ -249,21 +397,28 @@ async def generate_campaign(
                 owner = row.get("owner__login")
                 repo = row.get("name")
                 if owner and repo:
-                    url = f"https://raw.githubusercontent.com/{owner}/{repo}/main/README.md"
-                    try:
-                        resp = await client.get(url, timeout=5.0)
-                        if resp.status_code == 200:
-                            row["readme_content"] = resp.text
-                            logger.info("✅  Fetched README for %s/%s", owner, repo)
-                        else:
-                            # Try master branch fallback
-                            url_master = f"https://raw.githubusercontent.com/{owner}/{repo}/master/README.md"
-                            resp_master = await client.get(url_master, timeout=5.0)
-                            if resp_master.status_code == 200:
-                                row["readme_content"] = resp_master.text
-                                logger.info("✅  Fetched README (master) for %s/%s", owner, repo)
-                    except Exception as exc:
-                        logger.warning("Failed to fetch README for %s/%s: %s", owner, repo, exc)
+                    # Try common branch names and cases
+                    branches = ["main", "master"]
+                    filenames = ["README.md", "readme.md", "Readme.md"]
+                    
+                    readme_fetched = False
+                    for branch in branches:
+                        if readme_fetched: break
+                        for filename in filenames:
+                            url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{filename}"
+                            try:
+                                resp = await client.get(url, timeout=5.0)
+                                if resp.status_code == 200:
+                                    row["readme_content"] = resp.text
+                                    logger.info("✅  Fetched README for %s/%s (%s/%s)", owner, repo, branch, filename)
+                                    print(f"\n\n{'='*80}\n[EXACT README CONTENT FETCHED FOR {owner}/{repo}]\n{'='*80}\n{resp.text}\n{'='*80}\n\n")
+                                    readme_fetched = True
+                                    break
+                            except Exception as exc:
+                                logger.debug("Failed to fetch %s on branch %s: %s", filename, branch, exc)
+                    
+                    if not readme_fetched:
+                        logger.warning("Failed to fetch any README for %s/%s", owner, repo)
 
     # ── Step D: Raw Data → Marketing Campaign ─────────────────────────────
     logger.info("━" * 60)
@@ -300,3 +455,152 @@ async def generate_campaign(
     )
 
     return campaign
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Timeline endpoint
+# ═══════════════════════════════════════════════════════════════════════════════
+
+TIMELINE_SYSTEM_PROMPT = """\\
+You are an elite Developer Relations advocate and technical storyteller.
+Your job is to take a chronological list of raw GitHub events and translate them into a compelling "Developer Journal".
+
+You will receive a JSON list of events.
+1. Determine an overarching "theme" for the week.
+2. Write a 2-sentence journal entry summarizing the progress.
+3. Identify the "unsung hero" action (a bug fix, closing an old issue, refactoring, etc).
+4. Group and translate the raw events into a readable plain-English timeline, assigning a fitting emoji icon to each.
+
+Return a strictly formatted JSON object matching this JSON schema:
+{schema}
+
+Do not make up events.
+"""
+
+@app.get("/api/timeline", tags=["Analytics"])
+async def timeline():
+    """Fetch recent events from Coral and generate a narrated timeline."""
+    
+    # 1. Fetch raw events
+    events = run_coral_sql(
+        "SELECT 'CreateEvent' as type, created_at, name as repo FROM github.user_repos "
+        "UNION ALL SELECT 'PushEvent' as type, pushed_at as created_at, name as repo "
+        "FROM github.user_repos WHERE pushed_at IS NOT NULL "
+        "ORDER BY created_at DESC LIMIT 30;"
+    )
+
+    if not events:
+        raise HTTPException(status_code=404, detail="No recent activity found.")
+
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Missing GROQ_API_KEY.")
+
+    client = AsyncGroq(api_key=api_key)
+
+    # 2. Call LLM to narrate the timeline
+    user_message = f"Here is the raw activity data:\n```json\n{json.dumps(events, indent=2)}\n```"
+
+    try:
+        system_prompt = TIMELINE_SYSTEM_PROMPT.format(schema=json.dumps(TimelineLLMResponse.model_json_schema(), indent=2))
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=0.4,
+            response_format={"type": "json_object"}
+        )
+        
+        raw_text = response.choices[0].message.content
+        if not raw_text:
+            raise RuntimeError("Empty response from Groq.")
+            
+        llm_output = TimelineLLMResponse.model_validate_json(raw_text)
+        return llm_output.model_dump()
+        
+    except Exception as exc:
+        logger.error("Timeline generation failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Timeline generation failed: {exc}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Content Calendar endpoint
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class CalendarPost(BaseModel):
+    day: str = Field(..., description="The day of the week (e.g. Monday, Wednesday, Friday)")
+    theme: str = Field(..., description="The theme of the post (e.g. Deep Dive, Throwback)")
+    platform: str = Field(..., description="The social media platform (e.g. Twitter, LinkedIn)")
+    content: str = Field(..., description="The generated post copy.")
+
+class CalendarLLMResponse(BaseModel):
+    title: str = Field(..., description="A catchy title for the week's calendar")
+    posts: list[CalendarPost] = Field(..., description="A list of 3-5 scheduled posts")
+
+CALENDAR_SYSTEM_PROMPT = """\
+You are an elite Developer Relations strategist.
+Your job is to generate a multi-day social media content calendar for a developer based on their GitHub data.
+
+You will receive a JSON context with different slices of the developer's data (e.g., most active repo, most starred repo, older repo).
+Create a 3-day content calendar (e.g., Monday, Wednesday, Friday).
+Vary the platforms (Twitter/LinkedIn) and themes (e.g., Deep Dive, Throwback, Hype).
+
+Return a strictly formatted JSON object matching this JSON schema:
+{schema}
+
+Do not make up data that isn't in the provided context, but be creative with the marketing copy.
+"""
+
+@app.get("/api/calendar", tags=["Analytics"])
+async def calendar():
+    """Generate a multi-day content calendar using different data slices."""
+    
+    # 1. Fetch data slices
+    top_stars = run_coral_sql(
+        "SELECT name, stargazers_count, description FROM github.user_repos ORDER BY stargazers_count DESC LIMIT 1;"
+    )
+    recent_pushes = run_coral_sql(
+        "SELECT name as repo FROM github.user_repos WHERE pushed_at IS NOT NULL ORDER BY pushed_at DESC LIMIT 1;"
+    )
+    old_repo = run_coral_sql(
+        "SELECT name, created_at, description FROM github.user_repos ORDER BY created_at ASC LIMIT 1;"
+    )
+
+    context = {
+        "most_starred": top_stars,
+        "most_active_recently": recent_pushes,
+        "throwback": old_repo
+    }
+
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Missing GROQ_API_KEY.")
+
+    client = AsyncGroq(api_key=api_key)
+
+    user_message = f"Here is the developer's data context:\n```json\n{json.dumps(context, indent=2)}\n```"
+
+    try:
+        system_prompt = CALENDAR_SYSTEM_PROMPT.format(schema=json.dumps(CalendarLLMResponse.model_json_schema(), indent=2))
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=0.7,
+            response_format={"type": "json_object"}
+        )
+        
+        raw_text = response.choices[0].message.content
+        if not raw_text:
+            raise RuntimeError("Empty response from Groq.")
+            
+        llm_output = CalendarLLMResponse.model_validate_json(raw_text)
+        return llm_output.model_dump()
+        
+    except Exception as exc:
+        logger.error("Calendar generation failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Calendar generation failed: {exc}")

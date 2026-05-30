@@ -42,6 +42,7 @@ def synthesize_github_data(raw_data: List[Dict[str, Any]]) -> Dict[str, Any]:
     features: List[str] = []
     bug_fixes: List[str] = []
     general: List[str] = []
+    readmes: List[str] = []
     extracted_tokens: Set[str] = set()
     
     if is_commits:
@@ -119,8 +120,7 @@ def synthesize_github_data(raw_data: List[Dict[str, Any]]) -> Dict[str, Any]:
             
             readme = item.get("readme_content")
             if readme:
-                # Truncate to avoid blowing up the context window
-                general.append(f"README Snippet for {repo}:\n{readme[:1500]}...")
+                readmes.append(f"README for {repo}:\n{readme[:15000]}")
 
             for key, val in item.items():
                 if key == "readme_content":
@@ -150,6 +150,7 @@ def synthesize_github_data(raw_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         "categorized_activity": {
             "features": features,
             "bug_fixes": bug_fixes,
+            "readmes": readmes,
             "general_modifications": general,
         },
         "extracted_tokens": sorted(list(extracted_tokens)),
