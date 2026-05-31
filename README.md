@@ -47,38 +47,59 @@ Developers build amazing things, but rarely talk about them effectively. Their G
 
 ### Prerequisites
 - Python 3.10+
-- `GROQ_API_KEY` (for the fast, agentic LLM reasoning)
+- Node.js (for the Coral CLI)
+- A GitHub Personal Access Token (Classic or Fine-grained)
+- A [Groq API Key](https://console.groq.com/keys) (for ultra-fast AI reasoning)
 
-### Installation
+### 1. Install & Configure Coral
+This project uses Coral to fetch live data from your GitHub account.
 
-1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/coral.git
-cd coral
+# Install the Coral CLI globally
+npm install -g @coral-ai/cli
+
+# Authenticate Coral with your GitHub Token
+coral auth github --token "YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"
 ```
 
-2. Create a virtual environment and install dependencies
+### 2. Set Up the Project
+
+Clone the repository and install the dependencies:
 ```bash
+git clone https://github.com/yourusername/coral-devcreator.git
+cd coral-devcreator
+
+# Create a virtual environment
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
+
+# Install requirements
 pip install -r requirements.txt
 ```
 
-3. Set up your `.env` file
+### 3. Environment Variables
+Copy the example environment file and add your Groq API key:
 ```bash
-echo "GROQ_API_KEY=your_api_key_here" > .env
+cp .env.example .env
+```
+Open `.env` and paste your API key:
+```
+GROQ_API_KEY=gsk_your_api_key_here
 ```
 
-4. Run the backend server
+### 4. Run the Pipeline
+
+Start the FastAPI backend:
 ```bash
 uvicorn main:app --port 8000 --reload
 ```
 
-5. Open the UI
+Open the UI:
 Simply open `index.html` in your favorite modern browser, or serve it using a simple HTTP server:
 ```bash
 python -m http.server 3000
 ```
+Then navigate to `http://localhost:3000` in your browser.
 
 ---
 
